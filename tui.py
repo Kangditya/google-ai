@@ -23,7 +23,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Header, Link, RichLog, Select, Static
 
-from tui_core import STAGES, Outcome, command_for_step, mask_email, \
+from tui_core import STAGES, Outcome, command_for_step, is_native_platform, mask_email, \
     needs_setup, offer_explorer_lines, outcome_for_stage, read_fresh_report, \
     report_summary, validate_step
 from device_diagnostics import ConnectionDiagnosis, inspect_connection
@@ -62,7 +62,8 @@ class Approval(ModalScreen[bool]):
 
 
 def is_macos_platform() -> bool:
-    return sys.platform == "darwin"
+    """Kept for callers and tests; now true on every native-adapter host."""
+    return is_native_platform()
 
 
 class GoogleAITUI(App[None]):

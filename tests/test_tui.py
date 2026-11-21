@@ -33,15 +33,18 @@ class CoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             p = Path(folder)
             (p / "run-all.ps1").write_text("# test")
-            command = command_for_step(3, p, shell="powershell.exe")
+            # Pin the Windows route so this stays a Windows-route test on any host.
+            with patch("tui_core.sys.platform", "win32"):
+                command = command_for_step(3, p, shell="powershell.exe")
             self.assertEqual(command[-4:], ["-File", str(p / "run-all.ps1"), "-Step", "3"])
             self.assertNotIn("-AllStages", command)
             self.assertNotIn("-Force", command)
 
     def test_no_shell_or_script_fails_closed(self):
         with tempfile.TemporaryDirectory() as folder:
-            with self.assertRaises(FileNotFoundError):
-                command_for_step(1, Path(folder), shell="pwsh")
+            with patch("tui_core.sys.platform", "win32"):
+                with self.assertRaises(FileNotFoundError):
+                    command_for_step(1, Path(folder), shell="pwsh")
 
     def test_stale_reports_cannot_confirm_old_checkout(self):
         with tempfile.TemporaryDirectory() as folder:

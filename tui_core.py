@@ -23,6 +23,16 @@ class Stage:
 
 FRIDA_VERSION = "16.5.9"
 
+# macOS and Linux both use the native Python adapter (macos_runner.py) and never
+# require PowerShell. Windows keeps the run-all.ps1 route. The adapter's file
+# name is historical; renaming it later is a separate, larger change.
+NATIVE_PLATFORMS = ("darwin", "linux")
+
+
+def is_native_platform(platform: str | None = None) -> bool:
+    """True where the native Python adapter replaces the PowerShell wrapper."""
+    return (sys.platform if platform is None else platform) in NATIVE_PLATFORMS
+
 
 def needs_setup() -> bool:
     """Only install Android Python tooling when the required Frida build is absent."""
@@ -115,7 +125,7 @@ def validate_step(step: int) -> int:
 
 def command_for_step(step: int, repo: Path, shell: str | None = None) -> list[str]:
     validate_step(step)
-    if sys.platform == "darwin":
+    if is_native_platform():
         bridge = repo / "macos_runner.py"
         if not bridge.is_file():
             raise FileNotFoundError("macos_runner.py is missing")

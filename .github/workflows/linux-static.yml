@@ -1,0 +1,97 @@
+name: Linux (Ubuntu) static and mocked checks
+
+# Static and mocked checks only: no Android device, no ADB server, no Frida
+# attachment, and no Google Play checkout. Higher AGP (paid) stages are never
+# invoked here except through mocks that assert the approval gates refuse to run.
+on:
+  push:
+    paths:
+      - "run-linux.sh"
+      - "scripts/linux-doctor.py"
+      - "tui.py"
+      - "tui_core.py"
+      - "macos_runner.py"
+      - "ultra0.py"
+      - "device_selector.py"
+      - "tests/test_linux.py"
+      - "tests/test_tui.py"
+      - "tests/test_macos.py"
+      - "tests/test_english_only.py"
+      - "UBUNTU-SETUP.md"
+      - ".github/workflows/linux-static.yml"
+  pull_request:
+    paths:
+      - "run-linux.sh"
+      - "scripts/linux-doctor.py"
+      - "tui.py"
+      - "tui_core.py"
+      - "macos_runner.py"
+      - "ultra0.py"
+      - "device_selector.py"
+      - "tests/test_linux.py"
+      - "tests/test_tui.py"
+      - "tests/test_macos.py"
+      - "tests/test_english_only.py"
+      - "UBUNTU-SETUP.md"
+      - ".github/workflows/linux-static.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-static:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Launcher is valid POSIX shell and documents real charges
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh -n run-linux.sh
+          sh run-linux.sh --help | tee "${RUNNER_TEMP}/linux-help.txt"
+          grep -q "Steps 2" "${RUNNER_TEMP}/linux-help.txt"
+          grep -q "real charges" "${RUNNER_TEMP}/linux-help.txt"
+          if grep -q -- "--force" run-linux.sh; then
+            echo "::error::run-linux.sh must never pass --force"
+            exit 1
+          fi
+
+      - name: Doctor reports missing ADB without installing or touching anything
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          PATH="${RUNNER_TEMP}/empty-bin" python scripts/linux-doctor.py
+          code=$?
+          set -e
+          if [ "$code" -ne 2 ]; then
+            echo "::error::expected exit 2 for missing ADB, got $code"
+            exit 1
+          fi
+
+      - name: Python syntax
+        run: python -m compileall -q ultra0.py device_selector.py tui.py tui_core.py macos_runner.py scripts/linux-doctor.py
+
+      - name: Install pinned UI dependency only
+        run: python -m pip install --disable-pip-version-check -r requirements-tui.txt
+
+      - name: Linux routing, launcher, doctor and approval-gate tests (mocked)
+        run: python -m unittest discover -s tests -p "test_linux.py" -v
+
+      - name: Shared TUI and native adapter regressions (mocked)
+        run: |
+          python -m unittest discover -s tests -p "test_tui.py" -v
+          python -m unittest discover -s tests -p "test_macos.py" -v
+
+      - name: Repository hygiene regressions (no Android)
+        run: |
+          python -m unittest discover -s tests -p "test_gitignore.py" -v
+          python -m unittest discover -s tests -p "test_english_only.py" -v
+          python -m unittest discover -s tests -p "test_repository_layout.py" -v
