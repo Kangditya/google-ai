@@ -306,6 +306,51 @@ class LinuxDoctorTests(unittest.TestCase):
         self.assertIn("no - the engine requires root", result.stdout)
         self.assertIn("Google One        MISSING", result.stdout)
 
+    def test_doctor_reports_frida_from_the_project_venv_not_its_own_interpreter(self):
+        """The doctor must inspect .venv, the interpreter the launcher actually uses.
+
+        It previously read the metadata of whichever interpreter invoked it, so a
+        host with a correctly pinned .venv reported "not installed".
+        """
+        with tempfile.TemporaryDirectory() as temp:
+            fake_root = Path(temp)
+            fake_venv_python = fake_root / ".venv/bin/python"
+            fake_venv_python.parent.mkdir(parents=True)
+            fake_venv_python.write_text(
+                "#!/bin/sh\n"
+                "if [ \"$1\" = \"-c\" ]; then echo 16.5.9; exit 0; fi\n"
+                "exit 1\n", encoding="utf-8")
+            fake_venv_python.chmod(0o755)
+            script = (DOCTOR.read_text(encoding="utf-8")
+                      .replace("ROOT = Path(__file__).resolve().parents[1]",
+                               f"ROOT = Path({str(fake_root)!r})"))
+            probe = fake_root / "doctor_probe.py"
+            probe.write_text(script, encoding="utf-8")
+            env = dict(os.environ)
+            env.pop("ADB_PATH", None)
+            result = subprocess.run([sys.executable, str(probe)], capture_output=True,
+                                    text=True, timeout=120, env=env)
+        self.assertIn("Frida (.venv) 16.5.9", result.stdout)
+        self.assertNotIn("not installed in this interpreter", result.stdout)
+
+    def test_doctor_says_when_the_venv_has_no_frida_yet(self):
+        with tempfile.TemporaryDirectory() as temp:
+            fake_root = Path(temp)
+            fake_venv_python = fake_root / ".venv/bin/python"
+            fake_venv_python.parent.mkdir(parents=True)
+            fake_venv_python.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+            fake_venv_python.chmod(0o755)
+            script = (DOCTOR.read_text(encoding="utf-8")
+                      .replace("ROOT = Path(__file__).resolve().parents[1]",
+                               f"ROOT = Path({str(fake_root)!r})"))
+            probe = fake_root / "doctor_probe.py"
+            probe.write_text(script, encoding="utf-8")
+            env = dict(os.environ)
+            env.pop("ADB_PATH", None)
+            result = subprocess.run([sys.executable, str(probe)], capture_output=True,
+                                    text=True, timeout=120, env=env)
+        self.assertIn("Frida (.venv) not installed yet", result.stdout)
+
     def test_doctor_never_prints_a_google_account_identifier(self):
         """Account IDs must never reach doctor output, even if a device reports one."""
         responses = {

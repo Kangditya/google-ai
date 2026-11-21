@@ -15,7 +15,6 @@ Account identifiers are never printed. Exit codes match run-linux.sh:
 from __future__ import annotations
 
 import argparse
-import importlib.metadata
 import os
 import platform
 import shutil
@@ -111,16 +110,30 @@ def main(argv: list[str] | None = None) -> int:
     git_text = git_version.stdout.strip() if git_version else ""
     print(f"  Git          {git_text or 'not found (optional)'}")
 
-    venv_ok = (ROOT / ".venv/bin/python").is_file()
+    venv_python = ROOT / ".venv/bin/python"
+    venv_ok = venv_python.is_file()
     print(f"  Project venv {'present' if venv_ok else 'absent (the launcher creates it)'}")
-    try:
-        installed = importlib.metadata.version("frida")
-    except importlib.metadata.PackageNotFoundError:
+
+    # Report the version inside the project venv, because that is the interpreter the
+    # launcher actually runs the engine with. Inspecting the interpreter that happens
+    # to invoke this script says nothing useful about a real run.
+    def frida_in(python: str) -> str | None:
+        probe = run([python, "-c",
+                     "import importlib.metadata as m; print(m.version('frida'))"], timeout=20)
+        if probe is None or probe.returncode != 0:
+            return None
+        value = probe.stdout.strip()
+        return value or None
+
+    if venv_ok:
+        installed = frida_in(str(venv_python))
+        print(f"  Frida (.venv) {installed or 'not installed yet'} (pinned {FRIDA_REQUIRED})")
+        if installed and installed != FRIDA_REQUIRED:
+            print(f"    Note: the launcher reinstalls {FRIDA_REQUIRED} when it does not "
+                  f"match; delete .venv to force a clean rebuild.")
+    else:
         installed = None
-    print(f"  Host Frida   {installed or 'not installed in this interpreter'} (pinned {FRIDA_REQUIRED})")
-    if installed and installed != FRIDA_REQUIRED:
-        print(f"    Note: an unpacked Frida {installed} is unrelated to .venv; "
-              f"the launcher pins {FRIDA_REQUIRED} inside .venv.")
+        print(f"  Frida (.venv) not created yet (pinned {FRIDA_REQUIRED})")
 
     adb = find_adb()
     if not adb:
