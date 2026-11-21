@@ -418,13 +418,24 @@ class GoogleAITUI(App[None]):
     def _refresh_elapsed(self) -> None:
         if not self.busy or self._started_at is None:
             return
+        # A 1 s timer can fire while the app is shutting down or after widgets are
+        # removed, which raised NoMatches and turned a clean exit into a traceback.
+        if not self.is_running or not self.is_mounted:
+            return
         elapsed = int(time.monotonic() - self._started_at)
-        self.query_one("#elapsed", Static).update(f"Elapsed: {elapsed // 60:02d}:{elapsed % 60:02d}")
-        if self._last_activity_at is not None:
-            idle = int(time.monotonic() - self._last_activity_at)
-            if idle >= 30:
-                self.query_one("#activity", Static).update(
-                    f"No new output for {idle}s. Check MuMu or technical details."
+        elapsed_panel = self.query("#elapsed")
+        if not elapsed_panel:
+            return
+        elapsed_panel.first(Static).update(
+            f"Elapsed: {elapsed // 60:02d}:{elapsed % 60:02d}")
+        if self._last_activity_at is None:
+            return
+        idle = int(time.monotonic() - self._last_activity_at)
+        if idle >= 30:
+            activity_panel = self.query("#activity")
+            if activity_panel:
+                activity_panel.first(Static).update(
+                    f"No new output for {idle}s. Check the Android device or technical details."
                 )
 
     def _set_workflow(self, step: int, state: str) -> None:

@@ -158,6 +158,22 @@ class LinuxRuntimeRoutingTests(unittest.TestCase):
                 child.assert_not_called()
 
 
+    def test_elapsed_timer_survives_widget_teardown(self):
+        """The 1 s timer must return quietly when the app is not mounted.
+
+        It previously queried #elapsed unconditionally, so a tick racing app
+        teardown raised NoMatches and turned a clean exit into a traceback.
+        """
+        from tui import GoogleAITUI
+        with tempfile.TemporaryDirectory() as temp:
+            app = GoogleAITUI(repo=Path(temp), selected_step=1)
+            app.busy = True
+            app._started_at = 0.0
+            app._last_activity_at = 0.0
+            for _ in range(3):
+                app._refresh_elapsed()  # returns quietly; cancellation is expected
+
+
 class LinuxLauncherTests(unittest.TestCase):
     """Argument handling for run-linux.sh; no devices or dependencies needed."""
 
