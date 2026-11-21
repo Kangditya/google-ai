@@ -1,5 +1,7 @@
 # Ubuntu 24.04+ — Linux port
 
+**Languages:** **English** · [Bahasa Indonesia](UBUNTU-SETUP.id.md)
+
 Native Linux support for **ePlus AI Toolkit**. This page covers Ubuntu 24.04+ with
 Python 3 and Android SDK Platform-Tools. It reuses the existing Python/Frida engine
 (`ultra0.py`) and the shared Textual dashboard through the same native adapter that

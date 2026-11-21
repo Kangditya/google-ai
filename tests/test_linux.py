@@ -429,5 +429,30 @@ class LinuxDocumentationTests(unittest.TestCase):
                 self.assertIn(f"Do not use `{forbidden}`", text)
 
 
+    def test_indonesian_translation_covers_the_same_sections(self):
+        """The Indonesian guide must stay structurally parallel to the English one."""
+        english_raw = (ROOT / "UBUNTU-SETUP.md").read_text(encoding="utf-8")
+        indonesian_raw = (ROOT / "UBUNTU-SETUP.id.md").read_text(encoding="utf-8")
+        # Count headings and code fences on the raw text; flat_markdown would erase them.
+        self.assertEqual(english_raw.count("\n## "), indonesian_raw.count("\n## "))
+        self.assertEqual(english_raw.count("```"), indonesian_raw.count("```"))
+        indonesian = flat_markdown(ROOT / "UBUNTU-SETUP.id.md")
+        for shared in ("run-linux.sh", "UBUNTU-SETUP.md", "module_521.b64",
+                       "US$1", "2–5", "5037", "5555", "27042", "--doctor"):
+            with self.subTest(token=shared):
+                self.assertIn(shared, indonesian)
+        # Each guide's switcher must point at the other language, not at itself.
+        self.assertIn("(UBUNTU-SETUP.id.md)", english_raw)
+        self.assertIn("(UBUNTU-SETUP.md)", indonesian_raw)
+        self.assertNotIn("(UBUNTU-SETUP.id.md)", indonesian_raw)
+
+    def test_indonesian_translation_keeps_the_charge_warning(self):
+        indonesian = flat_markdown(ROOT / "UBUNTU-SETUP.id.md")
+        self.assertIn("[!CAUTION]", indonesian)
+        self.assertIn("[!WARNING]", indonesian)
+        self.assertIn("3 × US$1 = US$3", indonesian)
+        self.assertIn("belum diaudit secara independen", indonesian)
+
+
 if __name__ == "__main__":
     unittest.main()
